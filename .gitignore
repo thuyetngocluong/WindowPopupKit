@@ -1,0 +1,23 @@
+# macOS
+.DS_Store
+
+# Swift Package Manager
+/.build
+/Packages
+Package.resolved
+.swiftpm/
+
+# Xcode — build products & user-specific state
+DerivedData/
+build/
+*.xcuserstate
+xcuserdata/
+
+# Note: Example/Example.xcodeproj IS tracked (project file + shared data),
+# only the per-user state above is ignored.
+
+# Demo videos — only the optimized GIFs in videos/ are tracked, not the raw .mov recordings
+videos/*.mov
+
+# Misc
+.netrc
