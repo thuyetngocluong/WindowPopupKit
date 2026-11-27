@@ -46,7 +46,7 @@ add it rather than writing code that cannot compile:
 ```swift
 // Package.swift
 dependencies: [
-    .package(url: "https://github.com/thuyetngocluong/WindowPopupKit.git", from: "1.1.0")
+    .package(url: "https://github.com/thuyetngocluong/WindowPopupKit.git", from: "1.1.1")
 ],
 targets: [
     .target(name: "App", dependencies: ["WindowPopupKit"])
@@ -62,9 +62,9 @@ Requirements: iOS / iPadOS 16, Mac Catalyst 16. The package is UIKit code, so
 destination.
 
 **Which version the project resolved matters.** This skill describes release
-1.1.0 and later. A project that added the package earlier may still be pinned to
-1.0.0 in `Package.resolved`; check there, or look for
-`startTrackingActiveWindow` in the package checkout. On 1.0.0:
+1.1.1 and later. A project that added the package earlier may still be pinned to
+an older one in `Package.resolved`; check there. On 1.0.0 (no
+`startTrackingActiveWindow` in the package checkout):
 
 - these do not exist and will not compile: `WPPopupConfiguration.windowScene`,
   `WPPopup.startTrackingActiveWindow()`,
@@ -75,15 +75,16 @@ destination.
   centered on the window rather than the safe area; `SafeArea.overridesTop` /
   `overridesBottom` have no effect.
 
-When the task needs any of that and the project is on 1.0.0, say so and let the
-user update: a `from: "1.0.0"` requirement already allows 1.1.0, so updating the
-package (in Xcode: File, Packages, Update to Latest Package Versions) is enough.
-Do not change their version pin or `Package.resolved` on your own.
+On 1.1.0 two behaviours differ, and `references/configuration.md` marks both:
+`maxWidth` / `maxHeight` conflict with a `.fill`, `.ratio` or `.constant` size
+instead of winning over it, and a drag on a sheet's header does nothing while
+its list is scrolled.
 
-Two behaviours changed after 1.1.0, and `references/configuration.md` marks
-both: `maxWidth` / `maxHeight` now win over a `.fill`, `.ratio` or `.constant`
-size instead of conflicting with it, and a drag on a sheet's header now moves
-the sheet even while its list is scrolled.
+When the task needs any of that and the project is on an older release, say so
+and let the user update: a `from: "1.0.0"` or `from: "1.1.0"` requirement
+already allows 1.1.1, so updating the package (in Xcode: File, Packages, Update
+to Latest Package Versions) is enough. Do not change their version pin or
+`Package.resolved` on your own.
 
 ## 2. Pick the shape
 

@@ -134,7 +134,7 @@ What breaks it:
 In SwiftUI content, prefer `frame(maxWidth:)`, padding and `ViewThatFits` over
 `GeometryReader` arithmetic on the screen. A sheet spans the window's width, so
 on a wide iPad or Mac window either cap the sheet itself,
-`config.positionConstraints.maxWidth = .constant(640)` (after release 1.1.0; it
+`config.positionConstraints.maxWidth = .constant(640)` (from release 1.1.1; it
 is then centered in the safe area), or give its content a readable column,
 which works on every version: `.frame(maxWidth: 640)` on the content, then
 `.frame(maxWidth: .infinity)` and the background around it.
