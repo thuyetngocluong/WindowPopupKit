@@ -46,7 +46,7 @@ add it rather than writing code that cannot compile:
 ```swift
 // Package.swift
 dependencies: [
-    .package(url: "https://github.com/thuyetngocluong/WindowPopupKit.git", from: "1.0.0")
+    .package(url: "https://github.com/thuyetngocluong/WindowPopupKit.git", from: "1.1.0")
 ],
 targets: [
     .target(name: "App", dependencies: ["WindowPopupKit"])
@@ -61,11 +61,10 @@ Requirements: iOS / iPadOS 16, Mac Catalyst 16. The package is UIKit code, so
 `swift build` on a Mac does not compile it; build for an iOS or Mac Catalyst
 destination.
 
-**Which version the project resolved matters.** This skill describes the
-package as of the commit it ships with. Release 1.0.0 predates part of it, and
-until a later release is tagged, `from: "1.0.0"` resolves to exactly 1.0.0.
-Check `Package.resolved`, or look for `startTrackingActiveWindow` in the package
-checkout. On 1.0.0:
+**Which version the project resolved matters.** This skill describes release
+1.1.0 and later. A project that added the package earlier may still be pinned to
+1.0.0 in `Package.resolved`; check there, or look for
+`startTrackingActiveWindow` in the package checkout. On 1.0.0:
 
 - these do not exist and will not compile: `WPPopupConfiguration.windowScene`,
   `WPPopup.startTrackingActiveWindow()`,
@@ -77,9 +76,9 @@ checkout. On 1.0.0:
   `overridesBottom` have no effect.
 
 When the task needs any of that and the project is on 1.0.0, say so and let the
-user choose: a later release if one exists by then, or a dependency on the
-`master` branch or a specific revision. Do not change their version pin on your
-own.
+user update: a `from: "1.0.0"` requirement already allows 1.1.0, so updating the
+package (in Xcode: File, Packages, Update to Latest Package Versions) is enough.
+Do not change their version pin or `Package.resolved` on your own.
 
 ## 2. Pick the shape
 

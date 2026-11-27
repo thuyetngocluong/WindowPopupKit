@@ -71,7 +71,7 @@ if choice as? String == "confirm" { delete() }
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/thuyetngocluong/WindowPopupKit.git", from: "1.0.0")
+    .package(url: "https://github.com/thuyetngocluong/WindowPopupKit.git", from: "1.1.0")
 ]
 ```
 

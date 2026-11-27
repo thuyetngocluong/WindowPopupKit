@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-27
+
 ### Added
 
 - Mac Catalyst support (`.macCatalyst(.v16)`); the example app builds for
@@ -97,5 +99,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   entrance/exit animations, haptics, and lifecycle hooks.
 - Zero third-party dependencies (pure UIKit + SwiftUI).
 
-[Unreleased]: https://github.com/thuyetngocluong/WindowPopupKit/compare/1.0.0...HEAD
+[Unreleased]: https://github.com/thuyetngocluong/WindowPopupKit/compare/1.1.0...HEAD
+[1.1.0]: https://github.com/thuyetngocluong/WindowPopupKit/compare/1.0.0...1.1.0
 [1.0.0]: https://github.com/thuyetngocluong/WindowPopupKit/releases/tag/1.0.0
