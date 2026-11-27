@@ -80,6 +80,11 @@ user update: a `from: "1.0.0"` requirement already allows 1.1.0, so updating the
 package (in Xcode: File, Packages, Update to Latest Package Versions) is enough.
 Do not change their version pin or `Package.resolved` on your own.
 
+Two behaviours changed after 1.1.0, and `references/configuration.md` marks
+both: `maxWidth` / `maxHeight` now win over a `.fill`, `.ratio` or `.constant`
+size instead of conflicting with it, and a drag on a sheet's header now moves
+the sheet even while its list is scrolled.
+
 ## 2. Pick the shape
 
 | The user wants | Call | Notes |

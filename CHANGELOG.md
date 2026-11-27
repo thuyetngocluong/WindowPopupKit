@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A drag that starts outside a sheet's scroll view, on a header or a grab
+  handle, now always moves the sheet. It was ignored while the scroll view was
+  scrolled away from its top, so a sheet with a long list could not be dragged
+  away by its handle until the list had been scrolled all the way back. A drag
+  that starts on the scroll view still scrolls it first, as before.
+- `maxWidth` / `maxHeight` now win over the size they sit beside. Next to a
+  `.fill`, `.ratio` or `.constant` that asked for more, both were required
+  constraints and Auto Layout broke one of them, usually the cap. A capped
+  `.fill(padding:)` width now fills the window up to the cap and is then
+  centered in the safe area, inside its padding; a capped `.fill` height keeps
+  the edge its position anchors. A popup without a cap is laid out as before.
+
 ## [1.1.0] - 2026-11-27
 
 ### Added

@@ -143,7 +143,7 @@ struct OptionSheet: View {
 
             Divider()
 
-            // The sheet can be dragged down only while this list is at its top.
+            // A drag on the list moves the sheet only while the list is at its top.
             ScrollView {
                 LazyVStack(spacing: 0) {
                     ForEach(options, id: \.self) { option in

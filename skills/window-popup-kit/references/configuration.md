@@ -46,10 +46,10 @@ Things the table implies that are easy to miss:
 ```swift
 var config = WPPopupConfiguration.defaultPopup
 config.position = .top                                   // .top | .center | .bottom | .custom(CGPoint)
-config.positionConstraints.width = .intrinsic            // .intrinsic | .constant(pt) | .ratio(0...1) | .fill(padding:)
-config.positionConstraints.maxWidth = .constant(480)     // caps an .intrinsic width
+config.positionConstraints.width = .fill(padding: 16)    // .intrinsic | .constant(pt) | .ratio(0...1) | .fill(padding:)
+config.positionConstraints.maxWidth = .constant(480)     // a cap: never wider than this
 config.positionConstraints.height = .intrinsic
-config.positionConstraints.maxHeight = .ratio(0.8)       // caps an .intrinsic height
+config.positionConstraints.maxHeight = .ratio(0.8)       // a cap: never taller than 80% of the window
 config.positionConstraints.verticalOffset = 8            // away from the anchored edge; shifts a centered popup down
 config.displayDuration = .seconds(3)                     // or .infinity
 ```
@@ -66,12 +66,17 @@ config.displayDuration = .seconds(3)                     // or .infinity
   `.ratio` is centered in the safe area and kept inside the window. `.fill`
   keeps its padding from the window's edges.
 - **`maxWidth` / `maxHeight`**: caps in the same vocabulary; `.intrinsic` means
-  no cap. A cap limits a size that comes from the content, so pair it with an
-  `.intrinsic` width or height. Do not put a cap next to a `.fill`, `.ratio` or
-  `.constant` on the same axis that can ask for more: both are required
-  constraints, and Auto Layout breaks one of them unpredictably. To keep the
-  content of a full-width sheet readable on a wide window, cap the content
-  instead (`.frame(maxWidth: 640)` inside a `.frame(maxWidth: .infinity)`).
+  no cap. A cap wins over the size on its axis: `.fill(padding: 0)` with
+  `maxWidth = .constant(640)` fills the window up to 640 pt and beyond that is
+  640 pt wide, centered in the safe area and inside its padding. A capped
+  `.fill` height keeps the edge its `position` anchors (the top for `.top`, the
+  bottom for `.bottom`) and stays centered for `.center`.
+  **Releases up to 1.1.0 do not do this:** there a cap beside a `.fill`,
+  `.ratio` or `.constant` that asks for more conflicts with it, and Auto Layout
+  breaks one of the two unpredictably. On those versions use a cap only with an
+  `.intrinsic` size, and keep a full-width sheet readable on a wide window by
+  capping the content instead (`.frame(maxWidth: 640)` inside a
+  `.frame(maxWidth: .infinity)`).
 - **`topInsetFromSafeArea`**: for a `.bottom` popup with `.intrinsic` height,
   stretches the popup up until its top edge is this far below the safe area. The
   height is then derived from the window. `.defaultModal` uses 59. An explicit
@@ -107,10 +112,13 @@ and either way for `.center` and `.custom`.
 - `.scrollOnly` lets the popup be dragged and spring back without ever
   dismissing.
 - When the content contains a scroll view (the first one found is used), the
-  drag is coordinated with it: in the dismiss direction the popup moves only
-  while that scroll view is at its top, wherever the drag starts, a header or
-  grab handle included. Dragging the other way pulls the popup against
-  resistance.
+  drag is coordinated with it. A drag that starts on the scroll view scrolls it
+  first and moves the popup only while the scroll view is at its top. A drag
+  that starts anywhere else, on a header or a grab handle, always moves the
+  popup. Dragging against the dismiss direction pulls the popup with resistance.
+  **Releases up to 1.1.0** treat every drag like one on the scroll view: a
+  header drag does nothing until the list is back at its top. There, give the
+  content a close control rather than relying on the handle.
 
 ## Appearance
 
