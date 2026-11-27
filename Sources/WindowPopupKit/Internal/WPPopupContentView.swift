@@ -379,8 +379,15 @@ class WPPopupContentView: UIView {
                 trackedScrollView = findScrollView(in: content.view)
             }
             if let scroll = trackedScrollView {
-                let loc = gesture.location(in: scroll)
-                panStartedInsideScroll = scroll.bounds.contains(loc)
+                // A pan is recognized only after the finger has travelled a
+                // little, so where it is now is not where it went down. Next to
+                // the scroll view's edge those few points decide which side the
+                // drag started on: a finger that lands on a grab handle and
+                // moves down is already over the list by the time this runs.
+                let now = gesture.location(in: scroll)
+                let travelled = gesture.translation(in: scroll)
+                let touchDown = CGPoint(x: now.x - travelled.x, y: now.y - travelled.y)
+                panStartedInsideScroll = scroll.bounds.contains(touchDown)
             } else {
                 panStartedInsideScroll = false
             }
@@ -429,7 +436,10 @@ class WPPopupContentView: UIView {
             guard shouldBeginSheetDrag(gesture: gesture) else { return }
         }
 
-        trackedScrollView?.contentOffset.y = 0
+        // Hold the list still while a drag that began on it moves the sheet.
+        // One that began elsewhere never reaches the list, which stays where
+        // the user left it.
+        if panStartedInsideScroll { trackedScrollView?.contentOffset.y = 0 }
 
         let y = isDismissDir ? translation.y : 0
         transform = CGAffineTransform(translationX: 0, y: y)
@@ -443,7 +453,10 @@ class WPPopupContentView: UIView {
     }
 
     private func shouldBeginSheetDrag(gesture: UIPanGestureRecognizer) -> Bool {
-        if let scrollView = trackedScrollView {
+        // A drag that starts on the scroll view scrolls it first, and the sheet
+        // takes over once the content is back at its top. A drag that starts
+        // anywhere else — a header, a grab handle — always moves the sheet.
+        if panStartedInsideScroll, let scrollView = trackedScrollView {
             guard scrollView.contentOffset.y <= 0 else { return false }
             scrollView.contentOffset.y = 0
         }
