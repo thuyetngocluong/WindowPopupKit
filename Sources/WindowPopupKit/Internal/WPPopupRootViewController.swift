@@ -48,11 +48,16 @@ class WPPopupRootViewController: UIViewController {
     /// it instead of piling up on top.
     private func adoptCornerAdaptedSafeArea() {
         var wanted: (top: CGFloat, bottom: CGFloat) = (0, 0)
+        // The corner-adapted regions arrived with the iOS 26 SDK (Xcode 26,
+        // Swift 6.2). An older toolchain builds the package without them and
+        // popups keep to the plain safe area.
+        #if compiler(>=6.2)
         if #available(iOS 26.0, *), let window = view.window {
             let adapted = window.edgeInsets(for: .safeArea(cornerAdaptation: .vertical))
             let plain = window.safeAreaInsets
             wanted = (max(0, adapted.top - plain.top), max(0, adapted.bottom - plain.bottom))
         }
+        #endif
         guard abs(wanted.top - appliedCornerInsets.top) > 0.5
             || abs(wanted.bottom - appliedCornerInsets.bottom) > 0.5 else { return }
         additionalSafeAreaInsets.top += wanted.top - appliedCornerInsets.top

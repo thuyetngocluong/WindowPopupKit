@@ -63,7 +63,7 @@ if choice as? String == "confirm" { delete() }
 
 - iOS / iPadOS 16.0+
 - Mac Catalyst 16.0+ (macOS 13+)
-- Xcode 16+ (the package declares Swift tools 6.0 and compiles in the Swift 5 language mode)
+- Xcode 16+ (the package declares Swift tools 6.0 and compiles in the Swift 5 language mode). Clearing iPad window controls and rounded display corners uses the iOS 26 SDK, so that part is compiled in from Xcode 26 on.
 
 ## Installation
 

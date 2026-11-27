@@ -50,8 +50,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Popups no longer slide under the window controls of a windowed iPad scene,
   and on a display with rounded corners but no top inset (iPhone Duo) content
   at the top starts clear of the corners. The popup's window adopts the
-  corner-adapted safe area (iOS 26+): about 43 pt more at the top of an iPad
-  window, 17 pt on iPhone Duo, nothing on an iPhone with a Dynamic Island in portrait.
+  corner-adapted safe area (iOS 26+, when built with Xcode 26 or later): about
+  43 pt more at the top of an iPad window, 17 pt on iPhone Duo, nothing on an
+  iPhone with a Dynamic Island in portrait.
 - The entrance animation measured its off-screen start before the popup had
   been laid out in its window, so in a windowed iPad scene a toast began its
   slide partly on screen. Layout is now settled first.
