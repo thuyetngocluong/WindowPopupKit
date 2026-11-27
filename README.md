@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/thuyetngocluong/WindowPopupKit/actions/workflows/ci.yml/badge.svg)](https://github.com/thuyetngocluong/WindowPopupKit/actions/workflows/ci.yml)
 [![Swift](https://img.shields.io/badge/Swift-5.9%20%7C%206.0-orange.svg)](https://swift.org)
-[![Platform](https://img.shields.io/badge/platform-iOS%2016%2B-blue.svg)](https://developer.apple.com/ios/)
+[![Platform](https://img.shields.io/badge/platform-iOS%20%7C%20iPadOS%20%7C%20Mac%20Catalyst-blue.svg)](https://developer.apple.com/ios/)
 [![SwiftPM](https://img.shields.io/badge/SwiftPM-compatible-brightgreen.svg)](https://swift.org/package-manager/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -61,7 +61,8 @@ if choice as? String == "confirm" { delete() }
 
 ## Requirements
 
-- iOS 16.0+
+- iOS / iPadOS 16.0+
+- Mac Catalyst 16.0+ (macOS 13+)
 - Xcode 16+ (the package declares Swift tools 6.0 and compiles in the Swift 5 language mode)
 
 ## Installation
@@ -153,11 +154,26 @@ WPLoading.register { BrandedSpinner() }                       // swap the global
 
 ## Example app
 
-A runnable demo lives in [`Example/`](Example). Open `Example/Example.xcodeproj` and run on an iOS 16+ simulator to try every shape — toasts, blocking loading, an `await`-for-result confirm dialog, a draggable bottom sheet, a scrollable sheet (drag-to-dismiss coordinated with an inner scroll view), a full-screen modal, a custom top card with haptics, and a popup anchored at an absolute screen point.
+A runnable demo lives in [`Example/`](Example). Open `Example/Example.xcodeproj` and run on an iPhone, iPhone Duo or iPad simulator, or on "My Mac (Mac Catalyst)", to try every shape — toasts, blocking loading, an `await`-for-result confirm dialog, a draggable bottom sheet, a scrollable sheet (drag-to-dismiss coordinated with an inner scroll view), a modal, a full-screen cover, a custom top card with haptics, a popup anchored at an absolute screen point, and (on iPad and Mac) a second window to see popups follow the window you use.
 
 ## Presentation presets
 
 `WPPopupConfiguration` ships ready-made presets: `.defaultToast`, `.defaultPopup`, `.defaultLoading`, `.defaultSheet`, `.defaultModal`, `.defaultFullScreen`, plus `defaultPopup(at:)` for an absolute screen point. Start from one and tweak.
+
+## Resizable windows, iPhone Duo, iPad & Mac
+
+A popup is laid out with constraints against its own window, so it follows that window while it resizes, rotates or folds — nothing is measured from the screen:
+
+- **Folding / resizing** — presets carry no fixed sizes. `.defaultModal` pins its top edge below the safe area (`positionConstraints.topInsetFromSafeArea`) and derives its height from the window, so it stays correct across an iPhone Duo fold, an iPad Split View resize or a Mac window drag.
+- **Safe area** — a `.top` or `.bottom` popup is anchored to the safe area by default (below the status bar, above the home indicator) and follows it as it changes. On iOS 26+ that includes what the plain safe area leaves out: the window controls of a windowed iPad scene and the rounded corners of a display with no top inset, so a toast never slides under either. Set `positionConstraints.safeArea.overridesTop` / `overridesBottom` to anchor that edge to the window instead, so the popup's background runs under the bar while hosted SwiftUI content still keeps itself inside the safe area; `.defaultSheet` and `.defaultModal` do this at the bottom, `.defaultToast` at the top. A popup sized by `.intrinsic`, `.constant` or `.ratio` is centered in the safe area and kept inside the window; `.fill(padding:)` keeps its padding from the window's edges. For `UIView` / `UIViewController` content anchored to the window, constrain to `safeAreaLayoutGuide` yourself.
+- **Several windows** — with more than one window of the app open (iPad multitasking, a Mac), a popup goes to a foreground window: the one that has focus, or when none has — a Mac app that is not frontmost — the one the user was last in (the window that last had focus on iOS 17 and later, or was last touched or clicked); the library starts keeping that record with the first popup, so call `startTrackingActiveWindow()` once at launch to have it from the start. Name the scene yourself when a popup belongs to one particular window whatever the user is doing; if that window has been closed by the time the popup is shown, the popup falls back to the automatic choice:
+
+```swift
+WPPopup.shared.startTrackingActiveWindow()          // once, at launch
+
+var config = WPPopupConfiguration.defaultSheet
+config.windowScene = view.window?.windowScene        // or: an explicit window
+```
 
 ## Key window & keyboard input
 
@@ -175,11 +191,14 @@ Why full-screen? A partial popup can't coherently *be* the key window while a pa
 
 ## Building & contributing
 
-WindowPopupKit is an iOS / UIKit package, so `swift build` on macOS won't work (UIKit isn't available on the host). Build and test through Xcode, or with `xcodebuild` against an iOS destination:
+WindowPopupKit is a UIKit package, so `swift build` on macOS won't work (UIKit isn't available on the host). Build and test through Xcode, or with `xcodebuild` against an iOS or Mac Catalyst destination:
 
 ```bash
 # Build for a generic iOS device
 xcodebuild -scheme WindowPopupKit -destination 'generic/platform=iOS' build
+
+# Build for Mac Catalyst
+xcodebuild -scheme WindowPopupKit -destination 'generic/platform=macOS,variant=Mac Catalyst' build
 
 # Run the unit tests on a simulator
 xcodebuild -scheme WindowPopupKit -destination 'platform=iOS Simulator,name=iPhone 16' test
@@ -189,7 +208,7 @@ Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Roadmap
 
-- **Multi-platform** — iOS only today; macOS / visionOS are candidates.
+- **Multi-platform** — iOS, iPadOS and Mac Catalyst today; native macOS (AppKit) / visionOS are candidates.
 
 ## License
 

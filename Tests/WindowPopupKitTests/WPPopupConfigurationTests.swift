@@ -89,8 +89,40 @@ final class WPPopupConfigurationTests: XCTestCase {
     }
 
     func testDefaultModalIsNotFullScreen() {
-        // Modal uses a constant height, so it is intentionally not a full-screen layout.
+        // Modal stops short of the top, so it is intentionally not a full-screen layout.
         XCTAssertFalse(WPPopupConfiguration.defaultModal.positionConstraints.isFullScreen)
+    }
+
+    func testDefaultModalHeightFollowsTheWindow() {
+        // No number captured from a screen or a window: the height is derived from
+        // a top pin against the safe area, so it stays right when the window resizes.
+        let constraints = WPPopupConfiguration.defaultModal.positionConstraints
+        XCTAssertTrue(WPPopupConfiguration.defaultModal.position.isBottom)
+        XCTAssertNotNil(constraints.topInsetFromSafeArea)
+        guard case .intrinsic = constraints.height else {
+            return XCTFail("defaultModal must not carry a fixed height")
+        }
+    }
+
+    func testTopInsetFromSafeAreaIsOffByDefault() {
+        XCTAssertNil(WPPopupConfiguration.PositionConstraints().topInsetFromSafeArea)
+        XCTAssertNil(WPPopupConfiguration.defaultSheet.positionConstraints.topInsetFromSafeArea)
+    }
+
+    func testSafeAreaIsRespectedUnlessAPresetOptsOut() {
+        let plain = WPPopupConfiguration.PositionConstraints().safeArea
+        XCTAssertFalse(plain.overridesTop)
+        XCTAssertFalse(plain.overridesBottom)
+
+        // Surfaces meant to reach the window edge say so explicitly.
+        XCTAssertTrue(WPPopupConfiguration.defaultSheet.positionConstraints.safeArea.overridesBottom)
+        XCTAssertTrue(WPPopupConfiguration.defaultModal.positionConstraints.safeArea.overridesBottom)
+        XCTAssertTrue(WPPopupConfiguration.defaultToast.positionConstraints.safeArea.overridesTop)
+    }
+
+    func testWindowSceneIsUnsetByDefault() {
+        XCTAssertNil(WPPopupConfiguration().windowScene)
+        XCTAssertNil(WPPopupConfiguration.defaultToast.windowScene)
     }
 
     func testDefaultPopupAtPointUsesCustomPosition() {
@@ -148,6 +180,120 @@ final class WPPopupConfigurationTests: XCTestCase {
 
         let literal: WPLoadingIdentifier = "spinner"
         XCTAssertEqual(literal.rawValue, "spinner")
+    }
+}
+
+// MARK: - Scene resolution
+
+final class WPSceneResolverTests: XCTestCase {
+
+    private typealias Traits = WPSceneResolver.Traits
+
+    func testNoCandidatesYieldsNil() {
+        XCTAssertNil(WPSceneResolver.preferredIndex(among: []))
+    }
+
+    func testForegroundSceneBeatsBackgroundScene() {
+        let candidates = [
+            Traits(activationState: .background, ownsKeyWindow: true),
+            Traits(activationState: .foregroundActive, ownsKeyWindow: false)
+        ]
+        XCTAssertEqual(WPSceneResolver.preferredIndex(among: candidates), 1)
+    }
+
+    func testKeyWindowBreaksTieBetweenForegroundScenes() {
+        // Two foreground scenes, neither focused nor touched yet: the one that
+        // owns a key window is the last-resort pick.
+        let candidates = [
+            Traits(activationState: .foregroundActive, ownsKeyWindow: false),
+            Traits(activationState: .foregroundActive, ownsKeyWindow: true)
+        ]
+        XCTAssertEqual(WPSceneResolver.preferredIndex(among: candidates), 1)
+    }
+
+    func testActiveAppearanceBreaksTieBetweenKeyWindows() {
+        // On a Mac every window of the app can report itself key at once; the
+        // frontmost one is the only one drawn as active.
+        let candidates = [
+            Traits(activationState: .foregroundActive, ownsKeyWindow: true),
+            Traits(activationState: .foregroundActive, ownsKeyWindow: true, hasActiveAppearance: true)
+        ]
+        XCTAssertEqual(WPSceneResolver.preferredIndex(among: candidates), 1)
+    }
+
+    func testLastTouchSettlesScenesTheSystemCannotTellApart() {
+        // Two Mac windows of one app: both foreground, both "key". Only the
+        // record of where the user last clicked separates them.
+        let candidates = [
+            Traits(activationState: .foregroundActive, ownsKeyWindow: true),
+            Traits(activationState: .foregroundActive, ownsKeyWindow: true, isLastInteracted: true)
+        ]
+        XCTAssertEqual(WPSceneResolver.preferredIndex(among: candidates), 1)
+    }
+
+    func testLastTouchDoesNotResurrectABackgroundScene() {
+        // The window touched last may since have been sent to the background.
+        let candidates = [
+            Traits(activationState: .background, ownsKeyWindow: false, isLastInteracted: true),
+            Traits(activationState: .foregroundActive, ownsKeyWindow: false)
+        ]
+        XCTAssertEqual(WPSceneResolver.preferredIndex(among: candidates), 1)
+    }
+
+    func testLastTouchOutranksKeyWindow() {
+        // Every scene has a key window of its own, so "key" says little; where
+        // the user last touched says which window they are in.
+        let candidates = [
+            Traits(activationState: .foregroundActive, ownsKeyWindow: true),
+            Traits(activationState: .foregroundActive, ownsKeyWindow: false, isLastInteracted: true)
+        ]
+        XCTAssertEqual(WPSceneResolver.preferredIndex(among: candidates), 1)
+    }
+
+    func testActiveAppearanceOutranksAnOlderTouch() {
+        // The user clicked in one Mac window, then brought another to the front
+        // without touching its content.
+        let candidates = [
+            Traits(activationState: .foregroundActive, ownsKeyWindow: true, isLastInteracted: true),
+            Traits(activationState: .foregroundActive, ownsKeyWindow: true, hasActiveAppearance: true)
+        ]
+        XCTAssertEqual(WPSceneResolver.preferredIndex(among: candidates), 1)
+    }
+
+    func testBackgroundSceneWithAKeyWindowLosesToTheVisibleOne() {
+        // Measured on iPad: a scene sent to the background still reports a key
+        // window. It must not capture the popup.
+        let candidates = [
+            Traits(activationState: .background, ownsKeyWindow: true),
+            Traits(activationState: .foregroundActive, ownsKeyWindow: true, hasActiveAppearance: true, isLastInteracted: true)
+        ]
+        XCTAssertEqual(WPSceneResolver.preferredIndex(among: candidates), 1)
+    }
+
+    func testActivationStateOutranksActiveAppearance() {
+        let candidates = [
+            Traits(activationState: .background, ownsKeyWindow: true, hasActiveAppearance: true),
+            Traits(activationState: .foregroundActive, ownsKeyWindow: false)
+        ]
+        XCTAssertEqual(WPSceneResolver.preferredIndex(among: candidates), 1)
+    }
+
+    func testActiveSceneBeatsInactiveScene() {
+        let candidates = [
+            Traits(activationState: .foregroundInactive, ownsKeyWindow: true),
+            Traits(activationState: .foregroundActive, ownsKeyWindow: false)
+        ]
+        XCTAssertEqual(WPSceneResolver.preferredIndex(among: candidates), 1)
+    }
+
+    func testFallsBackToWhateverIsConnected() {
+        // While the app is still launching nothing is in the foreground yet; a
+        // popup shown then must still find a scene.
+        let candidates = [
+            Traits(activationState: .unattached, ownsKeyWindow: false),
+            Traits(activationState: .background, ownsKeyWindow: false)
+        ]
+        XCTAssertEqual(WPSceneResolver.preferredIndex(among: candidates), 1)
     }
 }
 

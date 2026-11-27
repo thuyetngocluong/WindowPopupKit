@@ -106,6 +106,11 @@ class WPPopupContentView: UIView {
 
     // MARK: - Layout
 
+    /// Below the default compression resistance (750), above the centering.
+    private static let horizontalEdgeGuardPriority = UILayoutPriority(745)
+    private static let horizontalCenterPriority = UILayoutPriority(740)
+    private static let topPinPriority = UILayoutPriority(999)
+
     private func setupConstraints() {
         let constraints = configuration.positionConstraints
         
@@ -119,16 +124,34 @@ class WPPopupContentView: UIView {
 
         var active: [NSLayoutConstraint] = []
 
+        // A popup sized by its content, a constant or a ratio is centered in the
+        // safe area, not the window: the two differ whenever one side carries an
+        // inset the other does not (e.g. a vertical system bar along one edge).
+        // The size itself is still measured against the window, so a wide popup
+        // centered on an off-center safe area could hang past a window edge; the
+        // edge guards outrank the centering to keep it inside. Both stay below
+        // the content's compression resistance, so a popup wider than the window
+        // overflows evenly, as it always has.
+        let centerInSafeArea: () -> [NSLayoutConstraint] = { [unowned self] in
+            let center = centerXAnchor.constraint(equalTo: superview.safeAreaLayoutGuide.centerXAnchor)
+            center.priority = Self.horizontalCenterPriority
+            let leadingGuard = leadingAnchor.constraint(greaterThanOrEqualTo: superview.leadingAnchor)
+            let trailingGuard = trailingAnchor.constraint(lessThanOrEqualTo: superview.trailingAnchor)
+            leadingGuard.priority = Self.horizontalEdgeGuardPriority
+            trailingGuard.priority = Self.horizontalEdgeGuardPriority
+            return [center, leadingGuard, trailingGuard]
+        }
+
         // Width
         switch constraints.width {
         case .intrinsic:
-            if !isCustomPosition { active.append(centerXAnchor.constraint(equalTo: superview.centerXAnchor)) }
+            if !isCustomPosition { active.append(contentsOf: centerInSafeArea()) }
         case .constant(let value):
             active.append(widthAnchor.constraint(equalToConstant: value))
-            if !isCustomPosition { active.append(centerXAnchor.constraint(equalTo: superview.centerXAnchor)) }
+            if !isCustomPosition { active.append(contentsOf: centerInSafeArea()) }
         case .ratio(let ratio):
             active.append(widthAnchor.constraint(equalTo: superview.widthAnchor, multiplier: ratio))
-            if !isCustomPosition { active.append(centerXAnchor.constraint(equalTo: superview.centerXAnchor)) }
+            if !isCustomPosition { active.append(contentsOf: centerInSafeArea()) }
         case .fill(let padding):
             if !isCustomPosition {
                 active.append(leadingAnchor.constraint(equalTo: superview.leadingAnchor, constant: padding))
@@ -181,15 +204,37 @@ class WPPopupContentView: UIView {
 
         // Position
         let offset = constraints.verticalOffset
+        // A `.fill` height has already pinned both edges to the window, so a
+        // second pin on one of them could only repeat it or contradict it.
+        let heightFillsWindow: Bool = {
+            if case .fill = constraints.height { return true }
+            return false
+        }()
+        // The anchor is a layout guide, not an inset read once: it follows the
+        // safe area through every resize, rotation and fold. A full-screen popup
+        // covers the window by definition, whatever the flags say.
+        let safeAreaGuide = superview.safeAreaLayoutGuide
+        let anchorsTopToWindow = constraints.safeArea.overridesTop || constraints.isFullScreen
+        let anchorsBottomToWindow = constraints.safeArea.overridesBottom || constraints.isFullScreen
         switch configuration.position {
         case .top:
-            let topInset = constraints.safeArea.overridesTop ? 0 : safeAreaInsets.top
-            active.append(topAnchor.constraint(equalTo: superview.topAnchor, constant: topInset + offset))
+            if !heightFillsWindow {
+                let top = anchorsTopToWindow ? superview.topAnchor : safeAreaGuide.topAnchor
+                active.append(topAnchor.constraint(equalTo: top, constant: offset))
+            }
         case .center:
             active.append(centerYAnchor.constraint(equalTo: superview.centerYAnchor, constant: offset))
         case .bottom:
-            let bottomInset = constraints.safeArea.overridesBottom ? 0 : safeAreaInsets.bottom
-            active.append(bottomAnchor.constraint(equalTo: superview.bottomAnchor, constant: -(bottomInset + offset)))
+            if !heightFillsWindow {
+                let bottom = anchorsBottomToWindow ? superview.bottomAnchor : safeAreaGuide.bottomAnchor
+                active.append(bottomAnchor.constraint(equalTo: bottom, constant: -offset))
+            }
+            if let topInset = constraints.topInsetFromSafeArea, case .intrinsic = constraints.height {
+                // Just below required, so a `maxHeight` cap wins without a conflict.
+                let topPin = topAnchor.constraint(equalTo: safeAreaGuide.topAnchor, constant: topInset)
+                topPin.priority = Self.topPinPriority
+                active.append(topPin)
+            }
         case .custom(let point):
             active.append(centerXAnchor.constraint(equalTo: superview.leadingAnchor, constant: point.x))
             active.append(centerYAnchor.constraint(equalTo: superview.topAnchor, constant: point.y))
@@ -479,21 +524,24 @@ class WPPopupContentView: UIView {
         guard let superview else { return }
 
         let anim = configuration.entranceAnimation
-        let savedAnchor = applyAnchorPointIfNeeded(anim.anchorPoint)
+        // The popup was set up before its window was shown. Settle the layout
+        // now that it is, so the off-screen start below is measured from where
+        // the popup will actually rest — final frame and safe area included.
+        superview.layoutIfNeeded()
         applyEntranceState(in: superview, animation: anim)
         backgroundView?.alpha = 0
 
         let targetAlpha = anim.fade?.to ?? 1
         let targetScale = anim.scale?.to ?? 1
+        let targetTransform = targetScale == 1
+            ? CGAffineTransform.identity
+            : Self.scaling(by: targetScale, about: anim.anchorPoint, in: bounds.size)
         await withCheckedContinuation { continuation in
             Self.performAnimation(anim) {
-                self.transform = targetScale == 1
-                    ? .identity
-                    : CGAffineTransform(scaleX: targetScale, y: targetScale)
+                self.transform = targetTransform
                 self.alpha = targetAlpha
                 self.backgroundView?.alpha = 1
-            } completion: { [weak self] in
-                self?.restoreAnchorPointIfNeeded(savedAnchor)
+            } completion: {
                 continuation.resume()
             }
         }
@@ -519,10 +567,12 @@ class WPPopupContentView: UIView {
             }
         }
 
-        transform = CGAffineTransform(translationX: tx, y: ty)
-
+        let offscreen = CGAffineTransform(translationX: tx, y: ty)
         if let scale = animation.scale {
-            transform = transform.scaledBy(x: scale.from, y: scale.from)
+            transform = Self.scaling(by: scale.from, about: animation.anchorPoint, in: bounds.size)
+                .concatenating(offscreen)
+        } else {
+            transform = offscreen
         }
 
         alpha = animation.fade != nil ? animation.fade!.from : 1
@@ -540,10 +590,10 @@ class WPPopupContentView: UIView {
         }
 
         let anim = configuration.exitAnimation
-        let savedAnchor = applyAnchorPointIfNeeded(anim.anchorPoint)
         var targetTransform = exitTranslation(in: superview)
         if let scale = anim.scale {
-            targetTransform = targetTransform.scaledBy(x: scale.to, y: scale.to)
+            targetTransform = Self.scaling(by: scale.to, about: anim.anchorPoint, in: bounds.size)
+                .concatenating(targetTransform)
         }
         let targetAlpha: CGFloat = anim.fade?.to ?? 1
 
@@ -552,7 +602,6 @@ class WPPopupContentView: UIView {
             self.alpha = targetAlpha
             self.backgroundView?.alpha = 0
         } completion: { [weak self] in
-            self?.restoreAnchorPointIfNeeded(savedAnchor)
             self?.removeContent()
         }
     }
@@ -612,26 +661,22 @@ class WPPopupContentView: UIView {
         }
     }
 
-    private func applyAnchorPointIfNeeded(_ anchorPoint: CGPoint?) -> CGPoint? {
-        guard let anchorPoint else { return nil }
-        let saved = layer.anchorPoint
-        let bounds = bounds
-        let oldAnchor = layer.anchorPoint
-        layer.anchorPoint = anchorPoint
-        let dx = (anchorPoint.x - oldAnchor.x) * bounds.width
-        let dy = (anchorPoint.y - oldAnchor.y) * bounds.height
-        layer.position = CGPoint(x: layer.position.x + dx, y: layer.position.y + dy)
-        return saved
-    }
-
-    private func restoreAnchorPointIfNeeded(_ saved: CGPoint?) {
-        guard let saved else { return }
-        let bounds = bounds
-        let oldAnchor = layer.anchorPoint
-        layer.anchorPoint = saved
-        let dx = (saved.x - oldAnchor.x) * bounds.width
-        let dy = (saved.y - oldAnchor.y) * bounds.height
-        layer.position = CGPoint(x: layer.position.x + dx, y: layer.position.y + dy)
+    /// A scale about `anchor` — a point in the popup's unit coordinate space,
+    /// `(0, 0)` its top-left corner — instead of about its center.
+    ///
+    /// The anchor is folded into the transform rather than set on the layer.
+    /// Auto Layout positions a view by its center on the assumption that the
+    /// layer's anchor point is the default, so a layout pass that lands while a
+    /// different one is in place (a window resize or a fold in the middle of the
+    /// animation) leaves the popup displaced by part of its own size.
+    static func scaling(by scale: CGFloat, about anchor: CGPoint?, in size: CGSize) -> CGAffineTransform {
+        let scaling = CGAffineTransform(scaleX: scale, y: scale)
+        guard let anchor else { return scaling }
+        let dx = (anchor.x - 0.5) * size.width
+        let dy = (anchor.y - 0.5) * size.height
+        return CGAffineTransform(translationX: -dx, y: -dy)
+            .concatenating(scaling)
+            .concatenating(CGAffineTransform(translationX: dx, y: dy))
     }
 
     private func removeContent() {

@@ -32,6 +32,12 @@ jobs:
           -scheme WindowPopupKit
           -destination 'generic/platform=iOS'
 
+      - name: Build (Mac Catalyst)
+        run: >
+          xcodebuild build
+          -scheme WindowPopupKit
+          -destination 'generic/platform=macOS,variant=Mac Catalyst'
+
       - name: Test
         run: >
           xcodebuild test

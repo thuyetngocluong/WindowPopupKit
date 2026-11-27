@@ -52,6 +52,28 @@ public struct WPPopupConfiguration: @unchecked Sendable {
     /// (`canBecomeKey` stays `false`) so the app underneath keeps keyboard focus.
     public var becomeKeyWindow: Bool = false
 
+    /// The scene the popup is presented in.
+    ///
+    /// Set this when the app can have more than one window on screen — iPad
+    /// multitasking, Stage Manager, a Mac — and the popup must appear in a
+    /// specific one, e.g. `view.window?.windowScene` of the view that triggered
+    /// it.
+    ///
+    /// When `nil` (the default) the popup goes to a foreground window: the one
+    /// that has focus, or when none has — a Mac app that is not frontmost — the
+    /// one the user was last in: the window that last had focus (iOS 17 and
+    /// later) or was last touched or clicked. That record starts with the first
+    /// popup; an app with several windows can start it at launch with
+    /// `WPPopup.shared.startTrackingActiveWindow()`. Set this property when the
+    /// popup belongs to one particular window whatever the user is doing — e.g.
+    /// the result of a background task for one document.
+    ///
+    /// The scene is held weakly, and one that is no longer connected when the
+    /// popup is shown — its window was closed in the meantime — is ignored: the
+    /// popup then goes to a window chosen as described above. Check the scene
+    /// yourself first if the popup must not appear anywhere else.
+    public weak var windowScene: UIWindowScene?
+
     // MARK: - Feedback & Lifecycle
 
     public var hapticFeedback: HapticFeedback = .none
@@ -67,6 +89,12 @@ extension WPPopupConfiguration {
     nonisolated(unsafe) public static var defaultToast: WPPopupConfiguration = {
         var c = WPPopupConfiguration()
         c.position = .top
+        // Anchored to the window with a small margin rather than to the safe
+        // area: hosted SwiftUI content insets itself, so the toast lands below
+        // whatever covers the top of the window (a status bar, window controls,
+        // rounded display corners), and 8 pt from the edge where nothing does.
+        c.positionConstraints.safeArea.overridesTop = true
+        c.positionConstraints.verticalOffset = 8
         c.displayDuration = .seconds(2)
         c.screenInteraction = .forward
         c.contentInteraction = .dismiss
@@ -112,6 +140,9 @@ extension WPPopupConfiguration {
     nonisolated(unsafe) public static var defaultSheet: WPPopupConfiguration = {
         var c = WPPopupConfiguration()
         c.position = .bottom
+        // The sheet's background reaches the bottom of the window, under the
+        // home indicator; its content stays above it.
+        c.positionConstraints.safeArea.overridesBottom = true
         c.displayDuration = .infinity
         c.screenInteraction = .absorbTouches
         c.contentInteraction = .absorbTouches
@@ -123,11 +154,18 @@ extension WPPopupConfiguration {
         return c
     }()
 
+    /// Strip of dimmed background `defaultModal` leaves between the top of the
+    /// safe area and the sheet, so it still reads as a modal on any window size.
+    private static let modalTopMargin: CGFloat = 59
+
     nonisolated(unsafe) public static var defaultModal: WPPopupConfiguration = {
         var c = WPPopupConfiguration()
-        let safeTopHeight: CGFloat = WPScreenMetrics.safeTopInset == 0 ? 0 : 59
         c.position = .bottom
-        c.positionConstraints = .init(width: .fill(padding: 0), height: .constant(WPScreenMetrics.screenHeight - 2*safeTopHeight))
+        c.positionConstraints = .init(
+            width: .fill(padding: 0),
+            safeArea: .init(overridesBottom: true),
+            topInsetFromSafeArea: modalTopMargin
+        )
         c.displayDuration = .infinity
         c.screenInteraction = .absorbTouches
         c.contentInteraction = .absorbTouches

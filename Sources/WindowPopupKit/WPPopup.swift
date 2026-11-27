@@ -9,6 +9,23 @@ public final class WPPopup: @unchecked Sendable {
 
     private var activeWindows: [WPPassthroughWindow] = []
 
+    // MARK: - Multiple windows
+
+    /// Starts remembering which window the user was last in.
+    ///
+    /// A popup shown without an explicit `windowScene` goes to a foreground
+    /// window: the one that has focus, or when none has — a Mac app that is not
+    /// frontmost — the one the user was last in: the window that last had focus
+    /// (iOS 17 and later) or was last touched or clicked. That record only
+    /// starts with the first popup.
+    /// An app that supports multiple windows can call this once at launch so
+    /// the record is already there. It is cheap, and calling it again does
+    /// nothing.
+    @MainActor
+    public func startTrackingActiveWindow() {
+        WPActiveSceneTracker.shared.start()
+    }
+
     // MARK: - Public API (SwiftUI presets)
 
     @discardableResult @MainActor
@@ -225,10 +242,7 @@ public final class WPPopup: @unchecked Sendable {
 
     @MainActor
     private func createWindow(with configuration: WPPopupConfiguration) -> WPPassthroughWindow? {
-        guard let scene = UIApplication.shared.connectedScenes
-            .compactMap({ $0 as? UIWindowScene })
-            .first
-        else { return nil }
+        guard let scene = resolveScene(for: configuration) else { return nil }
 
         let window = WPPassthroughWindow(windowScene: scene)
         window.overrideUserInterfaceStyle = configuration.windowInterfaceStyle
@@ -241,6 +255,19 @@ public final class WPPopup: @unchecked Sendable {
         }
         activeWindows.append(window)
         return window
+    }
+
+    /// The scene named by the configuration while it is still connected,
+    /// otherwise the one the user is interacting with.
+    @MainActor
+    private func resolveScene(for configuration: WPPopupConfiguration) -> UIWindowScene? {
+        if let scene = configuration.windowScene, scene.activationState != .unattached {
+            return scene
+        }
+        let tracker = WPActiveSceneTracker.shared
+        tracker.start()
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        return WPSceneResolver.preferredScene(among: scenes, lastInteracted: tracker.lastInteractedScene)
     }
 
     @MainActor

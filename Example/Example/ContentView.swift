@@ -22,8 +22,14 @@ struct ContentView: View {
                 sheetSection
                 customSection
                 uikitSection
+                windowSection
             }
             .navigationTitle("WindowPopupKit")
+            .task {
+                // Lets even the first popup find the window it was triggered from
+                // when several windows of the app are open.
+                WPPopup.shared.startTrackingActiveWindow()
+            }
         }
     }
 
@@ -101,6 +107,14 @@ struct ContentView: View {
                     await WPPopup.shared.sheet(configuration: config) { ScrollableSheetView() }
                 }
             }
+            row("Modal", "rectangle.portrait.topthird.inset.filled", .teal) {
+                // `defaultModal` leaves a strip of dimmed background below the safe
+                // area and derives its height from the window, so it keeps fitting
+                // while the window resizes, rotates or folds.
+                Task { @MainActor in
+                    await WPPopup.shared.show(configuration: .defaultModal) { ScrollableSheetView(title: "Modal") }
+                }
+            }
             row("Full screen", "rectangle.inset.filled", .purple) {
                 Task { @MainActor in await WPPopup.shared.fullScreen { DemoFullScreenView() } }
             }
@@ -118,6 +132,7 @@ struct ContentView: View {
             row("Top card + haptic + scale", "wand.and.stars", .pink) {
                 var config = WPPopupConfiguration.defaultPopup
                 config.position = .top
+                config.positionConstraints.verticalOffset = 8
                 config.hapticFeedback = .medium
                 config.entranceAnimation = .scaleAndFade
                 config.displayDuration = .seconds(2)
@@ -155,6 +170,23 @@ struct ContentView: View {
             Text("UIKit content")
         } footer: {
             Text("A UIView (not SwiftUI) shown through WindowPopupKit, dismissing itself via view.wpPopupDismiss.")
+        }
+    }
+
+    // MARK: - Multiple windows
+
+    @ViewBuilder
+    private var windowSection: some View {
+        if UIApplication.shared.supportsMultipleScenes {
+            Section {
+                row("Open another window", "macwindow.badge.plus", .mint) {
+                    UIApplication.shared.requestSceneSessionActivation(nil, userActivity: nil, options: nil)
+                }
+            } header: {
+                Text("Multiple windows")
+            } footer: {
+                Text("With two windows open, a popup appears in the window you triggered it from.")
+            }
         }
     }
 
@@ -247,6 +279,8 @@ private struct DemoSheetView: View {
 
 private struct ScrollableSheetView: View {
 
+    var title = "Scrollable Sheet"
+
     @Environment(\.wpPopupDismiss) private var dismiss
 
     var body: some View {
@@ -259,7 +293,7 @@ private struct ScrollableSheetView: View {
                     .frame(width: 40, height: 5)
 
                 HStack {
-                    Text("Scrollable Sheet")
+                    Text(title)
                         .font(.title3.bold())
                     Spacer()
                     Button { dismiss() } label: {
@@ -444,7 +478,10 @@ private final class DemoUIKitPopupView: UIView {
         NSLayoutConstraint.activate([
             card.topAnchor.constraint(equalTo: topAnchor),
             card.bottomAnchor.constraint(equalTo: bottomAnchor),
-            card.centerXAnchor.constraint(equalTo: centerXAnchor),
+            // The popup's container spans the whole window, so center on the safe
+            // area: a system bar along one side would otherwise push the card off
+            // the middle of the visible region.
+            card.centerXAnchor.constraint(equalTo: safeAreaLayoutGuide.centerXAnchor),
             card.widthAnchor.constraint(equalToConstant: 260),
             stack.topAnchor.constraint(equalTo: card.topAnchor, constant: 24),
             stack.leadingAnchor.constraint(equalTo: card.leadingAnchor, constant: 20),

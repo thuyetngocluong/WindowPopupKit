@@ -4,7 +4,8 @@ import PackageDescription
 let package = Package(
     name: "WindowPopupKit",
     platforms: [
-        .iOS(.v16)
+        .iOS(.v16),
+        .macCatalyst(.v16)
     ],
     products: [
         .library(name: "WindowPopupKit", targets: ["WindowPopupKit"])
