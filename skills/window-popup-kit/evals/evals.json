@@ -1,0 +1,42 @@
+{
+  "skill_name": "window-popup-kit",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "Finish NoteEditorView in the NotesApp project. Save should block the screen with a spinner while store.save(note) runs, then tell the user it was saved, or show them the error if it throws. Delete should first ask \"Delete this note?\" and only call store.delete(note.id) when they confirm; the question must stay up until they answer, a tap outside must not make it go away. After a successful delete, close the editor. WindowPopupKit is already a dependency, use it. Make sure the project still builds (the command is in README.md).",
+      "expected_output": "NoteEditorView.swift with Save wrapped in WPLoading that is dismissed on every path, success and error toasts, and a confirmation popup that is awaited, cannot be dismissed by an outside tap, and deletes only on an explicit confirm. The project builds.",
+      "files": [
+        "NotesApp/"
+      ],
+      "assertions": [
+        "The project builds (xcodebuild exits 0)",
+        "Save shows the loading overlay and dismisses it on both the success and the failure path",
+        "Success and failure are reported with WPToast",
+        "The delete confirmation is awaited and delete is called only on an explicit confirm (no result means cancel)",
+        "An outside tap cannot dismiss the confirmation (screenInteraction is .absorbTouches)",
+        "The confirmation is presented with a preset, not the bare configuration that closes itself after 2 seconds",
+        "No native fallback (.alert, .confirmationDialog, .sheet(isPresented:)) is used for the overlays",
+        "The files the agent wrote compile without warnings"
+      ]
+    },
+    {
+      "id": 1,
+      "prompt": "Finish NotesListViewController in the NotesApp project (it is UIKit). The app runs on iPad and Mac with several windows open at once. (1) Filter: open a bottom sheet about 60% of the window tall that lists store.tags and scrolls; choosing a tag closes the sheet and calls applyFilter(tag); closing the sheet without choosing leaves the filter alone. (2) Export: store.export() can take a minute. When it finishes, show \"Export finished\" (or the error) in the window where the user started the export, even if they have moved to another window in the meantime. Use WindowPopupKit, already a dependency. Make sure the project still builds (the command is in README.md).",
+      "expected_output": "NotesListViewController.swift presenting a .defaultSheet-based sheet sized with .ratio(0.6), awaiting the chosen tag, and an export completion message whose configuration carries the window scene captured when the export started. The project builds.",
+      "files": [
+        "NotesApp/"
+      ],
+      "assertions": [
+        "The project builds (xcodebuild exits 0)",
+        "The sheet height is relative to the window (.ratio(0.6)), not computed from UIScreen or a stored size",
+        "The sheet starts from a sheet preset, not the bare configuration that closes itself after 2 seconds",
+        "The chosen tag is actually awaited: no un-typed `await showPopup(...)` that returns immediately",
+        "Closing the sheet without choosing leaves the filter unchanged (nil is not applied as a filter)",
+        "The export message names the window scene, captured before the export is awaited",
+        "No scene is looked up through connectedScenes.first, UIApplication windows or keyWindow",
+        "The sheet content supplies its own surface (a background); .defaultSheet has none",
+        "The files the agent wrote compile without warnings"
+      ]
+    }
+  ]
+}

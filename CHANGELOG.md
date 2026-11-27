@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   touches are watched by a gesture recognizer added to each window, which only
   observes them and never recognizes, cancels or delays them.
 - An "Open another window" row in the example app (iPad and Mac).
+- An agent skill, `skills/window-popup-kit`, that teaches AI coding agents how
+  to integrate the package; its code examples are compiled against the
+  package.
 - `PositionConstraints.topInsetFromSafeArea` to stretch a bottom-anchored popup
   up to a line below the safe area, so its height follows the window.
 - A "Modal" row in the example app.

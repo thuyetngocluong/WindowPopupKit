@@ -189,6 +189,17 @@ await WPPopup.shared.show(configuration: config) { MyFormWithTextField() }
 
 Why full-screen? A partial popup can't coherently *be* the key window while a pass-through window still lets outside touches fall through — the key window would own keyboard/focus while most of the screen routes touches elsewhere. Full-screen content also keeps the keyboard in the safe-area regions so the layout can adapt around it. `WPPopup` asserts in debug if `becomeKeyWindow` is set without full-screen constraints, and the previous key window is restored automatically on dismiss.
 
+## AI coding agents
+
+The repository ships an [Agent Skill](skills/window-popup-kit) that teaches a coding agent (Claude Code and other tools that read `SKILL.md` skills) how to use the package: which call fits which shape, how to await a result, and the rules that keep popups right on resizable windows, iPhone Duo, iPad and Mac. Every code example in it is compiled against the package.
+
+Copy it next to your app's code, or into your user-level skills folder:
+
+```bash
+# from a clone of this repository, or from the package checkout Xcode keeps under SourcePackages/checkouts/WindowPopupKit
+cp -R skills/window-popup-kit /path/to/your-app/.claude/skills/
+```
+
 ## Building & contributing
 
 WindowPopupKit is a UIKit package, so `swift build` on macOS won't work (UIKit isn't available on the host). Build and test through Xcode, or with `xcodebuild` against an iOS or Mac Catalyst destination:
