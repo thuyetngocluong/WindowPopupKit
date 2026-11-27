@@ -310,4 +310,126 @@ final class WPPopupLayoutTests: XCTestCase {
         XCTAssertEqual(layout.frame.minY, 8, accuracy: 0.5)
         XCTAssertEqual(layout.frame.width, 466, accuracy: 0.5)
     }
+
+    // MARK: - Size caps
+
+    /// A wide window: an unfolded iPhone Duo, an iPad or a Mac window.
+    private let wideWindow = CGSize(width: 951, height: 669)
+    private let sheetContent = CGSize(width: 100, height: 120)
+
+    private func sheet(
+        width: WPPopupConfiguration.PositionConstraints.Edge = .fill(padding: 0),
+        maxWidth: WPPopupConfiguration.PositionConstraints.Edge
+    ) -> WPPopupConfiguration {
+        var configuration = WPPopupConfiguration.defaultSheet
+        configuration.positionConstraints.width = width
+        configuration.positionConstraints.maxWidth = maxWidth
+        return configuration
+    }
+
+    private func filling(
+        _ position: WPPopupConfiguration.Position,
+        maxHeight: WPPopupConfiguration.PositionConstraints.Edge
+    ) -> WPPopupConfiguration {
+        var configuration = WPPopupConfiguration()
+        configuration.position = position
+        configuration.positionConstraints = .init(width: .fill(padding: 0), height: .fill(padding: 10), maxHeight: maxHeight)
+        return configuration
+    }
+
+    func testMaxWidthCapsAFillWidthAndCentersItInTheSafeArea() {
+        let layout = layOut(sheet(maxWidth: .constant(640)), in: wideWindow, extraSafeArea: verticalBar, contentSize: sheetContent)
+        XCTAssertEqual(layout.frame.width, 640, accuracy: 0.5)
+        XCTAssertEqual(layout.frame.midX, layout.safeCenterX, accuracy: 0.5)
+        XCTAssertEqual(layout.frame.maxY, 669, accuracy: 0.5)
+    }
+
+    func testMaxWidthLeavesAFillWidthAloneInANarrowerWindow() {
+        // The cap does not bite, so the popup spans the window exactly as an
+        // uncapped `.fill` does, vertical bar or not.
+        let layout = layOut(sheet(maxWidth: .constant(640)), extraSafeArea: verticalBar, contentSize: sheetContent)
+        XCTAssertEqual(layout.frame.minX, 0, accuracy: 0.5)
+        XCTAssertEqual(layout.frame.width, 466, accuracy: 0.5)
+    }
+
+    func testCappedFillWidthKeepsItsPaddingWhenItFits() {
+        let layout = layOut(sheet(width: .fill(padding: 20), maxWidth: .constant(640)), extraSafeArea: verticalBar, contentSize: sheetContent)
+        XCTAssertEqual(layout.frame.minX, 20, accuracy: 0.5)
+        XCTAssertEqual(layout.frame.width, 426, accuracy: 0.5)
+    }
+
+    func testCappedFillWidthStaysInsideItsPaddingBesideAWideBar() {
+        // The safe area is far off center here: centering a 640 pt popup on it
+        // would push the popup past its leading padding.
+        let wideBar = UIEdgeInsets(top: 0, left: 0, bottom: 0, right: 300)
+        let layout = layOut(
+            sheet(width: .fill(padding: 20), maxWidth: .constant(640)),
+            in: CGSize(width: 700, height: 669),
+            extraSafeArea: wideBar,
+            contentSize: sheetContent
+        )
+        XCTAssertEqual(layout.frame.width, 640, accuracy: 0.5)
+        XCTAssertEqual(layout.frame.minX, 20, accuracy: 0.5)
+    }
+
+    func testMaxWidthCapsARatioWidth() {
+        var configuration = centered(width: .ratio(0.9))
+        configuration.positionConstraints.maxWidth = .constant(300)
+        let layout = layOut(configuration, extraSafeArea: verticalBar)
+        XCTAssertEqual(layout.frame.width, 300, accuracy: 0.5)
+        XCTAssertEqual(layout.frame.midX, layout.safeCenterX, accuracy: 0.5)
+    }
+
+    func testMaxWidthCapsAConstantWidth() {
+        var configuration = centered(width: .constant(400))
+        configuration.positionConstraints.maxWidth = .ratio(0.5)
+        let layout = layOut(configuration)
+        XCTAssertEqual(layout.frame.width, 233, accuracy: 0.5)
+    }
+
+    func testMaxWidthLeavesASmallerWidthAlone() {
+        var configuration = centered(width: .constant(200))
+        configuration.positionConstraints.maxWidth = .constant(300)
+        XCTAssertEqual(layOut(configuration).frame.width, 200, accuracy: 0.5)
+    }
+
+    func testMaxHeightCapsARatioHeightAndKeepsASheetOnTheBottom() {
+        var configuration = WPPopupConfiguration.defaultSheet
+        configuration.positionConstraints.height = .ratio(0.7)
+        configuration.positionConstraints.maxHeight = .constant(300)
+        let layout = layOut(configuration)
+        XCTAssertEqual(layout.frame.height, 300, accuracy: 0.5)
+        XCTAssertEqual(layout.frame.maxY, 678, accuracy: 0.5)
+    }
+
+    func testMaxHeightLeavesARatioHeightAloneWhenItFits() {
+        var configuration = WPPopupConfiguration.defaultSheet
+        configuration.positionConstraints.height = .ratio(0.5)
+        configuration.positionConstraints.maxHeight = .constant(400)
+        XCTAssertEqual(layOut(configuration).frame.height, 339, accuracy: 0.5)
+    }
+
+    func testMaxHeightCapsAFillHeightFromTheTop() {
+        let layout = layOut(filling(.top, maxHeight: .constant(300)))
+        XCTAssertEqual(layout.frame.minY, 10, accuracy: 0.5)
+        XCTAssertEqual(layout.frame.height, 300, accuracy: 0.5)
+    }
+
+    func testMaxHeightCapsAFillHeightFromTheBottom() {
+        let layout = layOut(filling(.bottom, maxHeight: .constant(300)))
+        XCTAssertEqual(layout.frame.maxY, 668, accuracy: 0.5)
+        XCTAssertEqual(layout.frame.height, 300, accuracy: 0.5)
+    }
+
+    func testMaxHeightCapsAFillHeightAroundTheCenter() {
+        let layout = layOut(filling(.center, maxHeight: .constant(300)))
+        XCTAssertEqual(layout.frame.midY, 339, accuracy: 0.5)
+        XCTAssertEqual(layout.frame.height, 300, accuracy: 0.5)
+    }
+
+    func testMaxHeightLeavesAFillHeightAloneWhenItFits() {
+        let layout = layOut(filling(.bottom, maxHeight: .constant(900)))
+        XCTAssertEqual(layout.frame.minY, 10, accuracy: 0.5)
+        XCTAssertEqual(layout.frame.maxY, 668, accuracy: 0.5)
+    }
 }

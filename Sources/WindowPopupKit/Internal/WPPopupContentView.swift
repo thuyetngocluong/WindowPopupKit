@@ -110,6 +110,13 @@ class WPPopupContentView: UIView {
     private static let horizontalEdgeGuardPriority = UILayoutPriority(745)
     private static let horizontalCenterPriority = UILayoutPriority(740)
     private static let topPinPriority = UILayoutPriority(999)
+    /// A size rule that has a cap beside it (`maxWidth` / `maxHeight`): just
+    /// below required, so the cap wins without a conflict, and far above
+    /// everything the content asks for.
+    private static let cappedSizePriority = UILayoutPriority(990)
+    /// Where a capped `.fill` width goes with the room the cap leaves. Below the
+    /// rule above, so it decides nothing until the cap bites.
+    private static let cappedFillCenterPriority = UILayoutPriority(980)
 
     private func setupConstraints() {
         let constraints = configuration.positionConstraints
@@ -142,22 +149,52 @@ class WPPopupContentView: UIView {
             return [center, leadingGuard, trailingGuard]
         }
 
+        // A cap always wins over the size it sits beside: "fill the window, but
+        // no wider than 640" means 640 in a wide window. Both would otherwise be
+        // required constraints, and Auto Layout would break one of them at
+        // random. The rule steps down only when there is a cap, so an uncapped
+        // popup is laid out exactly as before.
+        let widthIsCapped: Bool = {
+            if case .intrinsic = constraints.maxWidth { return false }
+            return true
+        }()
+        let heightIsCapped: Bool = {
+            if case .intrinsic = constraints.maxHeight { return false }
+            return true
+        }()
+        let yielding: (NSLayoutConstraint, Bool) -> NSLayoutConstraint = { constraint, isCapped in
+            if isCapped { constraint.priority = Self.cappedSizePriority }
+            return constraint
+        }
+
         // Width
         switch constraints.width {
         case .intrinsic:
             if !isCustomPosition { active.append(contentsOf: centerInSafeArea()) }
         case .constant(let value):
-            active.append(widthAnchor.constraint(equalToConstant: value))
+            active.append(yielding(widthAnchor.constraint(equalToConstant: value), widthIsCapped))
             if !isCustomPosition { active.append(contentsOf: centerInSafeArea()) }
         case .ratio(let ratio):
-            active.append(widthAnchor.constraint(equalTo: superview.widthAnchor, multiplier: ratio))
+            active.append(yielding(widthAnchor.constraint(equalTo: superview.widthAnchor, multiplier: ratio), widthIsCapped))
             if !isCustomPosition { active.append(contentsOf: centerInSafeArea()) }
         case .fill(let padding):
             if !isCustomPosition {
-                active.append(leadingAnchor.constraint(equalTo: superview.leadingAnchor, constant: padding))
-                active.append(trailingAnchor.constraint(equalTo: superview.trailingAnchor, constant: -padding))
+                active.append(yielding(leadingAnchor.constraint(equalTo: superview.leadingAnchor, constant: padding), widthIsCapped))
+                active.append(yielding(trailingAnchor.constraint(equalTo: superview.trailingAnchor, constant: -padding), widthIsCapped))
+                if widthIsCapped {
+                    // Once the cap bites, the two pins can no longer both hold.
+                    // They are equally strong, so every spot between them costs
+                    // the same and this weaker constraint picks one: the middle
+                    // of the safe area, like any other popup narrower than its
+                    // window. The padding stays a hard limit on both sides.
+                    let center = centerXAnchor.constraint(equalTo: superview.safeAreaLayoutGuide.centerXAnchor)
+                    center.priority = Self.cappedFillCenterPriority
+                    active.append(center)
+                    active.append(leadingAnchor.constraint(greaterThanOrEqualTo: superview.leadingAnchor, constant: padding))
+                    active.append(trailingAnchor.constraint(lessThanOrEqualTo: superview.trailingAnchor, constant: -padding))
+                }
             } else {
-                active.append(widthAnchor.constraint(equalTo: superview.widthAnchor, constant: -2 * padding))
+                active.append(yielding(widthAnchor.constraint(equalTo: superview.widthAnchor, constant: -2 * padding), widthIsCapped))
             }
         }
 
@@ -178,15 +215,31 @@ class WPPopupContentView: UIView {
         case .intrinsic:
             break
         case .constant(let value):
-            active.append(heightAnchor.constraint(equalToConstant: value))
+            active.append(yielding(heightAnchor.constraint(equalToConstant: value), heightIsCapped))
         case .ratio(let ratio):
-            active.append(heightAnchor.constraint(equalTo: superview.heightAnchor, multiplier: ratio))
+            active.append(yielding(heightAnchor.constraint(equalTo: superview.heightAnchor, multiplier: ratio), heightIsCapped))
         case .fill(let padding):
             if !isCustomPosition {
-                active.append(topAnchor.constraint(equalTo: superview.topAnchor, constant: padding))
-                active.append(bottomAnchor.constraint(equalTo: superview.bottomAnchor, constant: -padding))
+                let top = topAnchor.constraint(equalTo: superview.topAnchor, constant: padding)
+                let bottom = bottomAnchor.constraint(equalTo: superview.bottomAnchor, constant: -padding)
+                if heightIsCapped {
+                    // The edge the popup is anchored to keeps its pin and the
+                    // other one gives way; a centered popup lets go of both and
+                    // is held by its centering constraint below.
+                    switch configuration.position {
+                    case .top:
+                        bottom.priority = Self.cappedSizePriority
+                    case .bottom:
+                        top.priority = Self.cappedSizePriority
+                    case .center, .custom:
+                        top.priority = Self.cappedSizePriority
+                        bottom.priority = Self.cappedSizePriority
+                    }
+                }
+                active.append(top)
+                active.append(bottom)
             } else {
-                active.append(heightAnchor.constraint(equalTo: superview.heightAnchor, constant: -2 * padding))
+                active.append(yielding(heightAnchor.constraint(equalTo: superview.heightAnchor, constant: -2 * padding), heightIsCapped))
             }
         }
 
